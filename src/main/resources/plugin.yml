@@ -1,0 +1,6 @@
+name: EntityCages
+version: '${project.version}'
+main: mbarrr.github.entitycages.EntityCages
+api-version: 1.16
+authors: [ MBarrr ]
+website: https://github.com/MBarrr
