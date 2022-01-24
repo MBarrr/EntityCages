@@ -4,3 +4,7 @@ main: mbarrr.github.entitycages.EntityCages
 api-version: 1.16
 authors: [ MBarrr ]
 website: https://github.com/MBarrr
+commands:
+  getCage:
+    usage: /getcage
+    description: §eUsed to get a cage item.
