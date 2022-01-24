@@ -17,8 +17,6 @@ import java.util.List;
 public class GetCageCommand implements CommandExecutor {
 
 
-    ItemStack cage = makeCage();
-
 
 
     @Override
@@ -28,23 +26,10 @@ public class GetCageCommand implements CommandExecutor {
 
         Player player = (Player) sender;
 
-        player.getInventory().addItem(cage);
+        player.getInventory().addItem(EntityCages.getInstance().getCage());
 
 
 
         return true;
-    }
-
-    private ItemStack makeCage(){
-        ItemStack cage = new ItemStack(EntityCages.getInstance().getCageItem());
-        List<String> lore = new ArrayList<>();
-        lore.add(EntityCages.getInstance().getEmptyLoreLine());
-        ItemMeta itemMeta = cage.getItemMeta();
-        itemMeta.setDisplayName("§eCage");
-        itemMeta.setLore(lore);
-        PersistentDataContainer container = itemMeta.getPersistentDataContainer();
-        container.set(EntityCages.getInstance().getCageKey(), PersistentDataType.STRING, "");
-        cage.setItemMeta(itemMeta);
-        return cage;
     }
 }

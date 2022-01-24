@@ -1,46 +1,77 @@
 package mbarrr.github.entitycages;
 
-import com.sun.tools.javac.util.Names;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
-import org.bukkit.entity.Animals;
+//TODO
+//Maybe add some particles
+//make type in description lower case
+
+import org.bukkit.*;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.rmi.server.UID;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 public final class EntityCages extends JavaPlugin implements Listener {
 
+    private ItemStack cage;
     private Material cageItemType = Material.GLASS_BOTTLE;
     private String cageKeyString = "cage";
     private String emptyLoreLine = "§eRight click an animal to capture it.";
     private String capturedLoreLine = "§eRight click a block to release this animal";
     NamespacedKey cageKey = new NamespacedKey(this, getCageKeyString());
     NamespacedKey key = new NamespacedKey(this, "trapped-animal");
-
+    NamespacedKey worldKey = new NamespacedKey(this, "trapped-animal-world");
 
     @Override
     public void onEnable() {
         // Plugin startup logic
         this.getCommand("GetCage").setExecutor(new GetCageCommand());
         getServer().getPluginManager().registerEvents(this, this);
+        cage = makeCage();
+        loadRecipe();
     }
 
     @Override
     public void onDisable() {
         // Plugin shutdown logic
+
+        
+    }
+
+    private void loadRecipe(){
+        ShapedRecipe cageRecipe = new ShapedRecipe(
+                new NamespacedKey(this, "test"),
+                cage
+        );
+        cageRecipe.shape("CCC", "C C", "CCC");
+        cageRecipe.setIngredient('C', Material.IRON_BARS);
+        Bukkit.addRecipe(cageRecipe);
+    }
+
+    private ItemStack makeCage(){
+        ItemStack cage = new ItemStack(getCageItem());
+        List<String> lore = new ArrayList<>();
+        lore.add(getEmptyLoreLine());
+        ItemMeta itemMeta = cage.getItemMeta();
+        itemMeta.setDisplayName("§eCage");
+        itemMeta.setLore(lore);
+        PersistentDataContainer container = itemMeta.getPersistentDataContainer();
+        container.set(getCageKey(), PersistentDataType.STRING, "");
+        cage.setItemMeta(itemMeta);
+        return cage;
     }
 
     @EventHandler
@@ -50,7 +81,7 @@ public final class EntityCages extends JavaPlugin implements Listener {
         //Stop the function if the item is not the cage item.
         if(!clickedItem.getType().equals(cageItemType)) return;
         //Stop the function if the entity is not an animal.
-        if(!(e.getRightClicked() instanceof Animals)) return;
+        if(!(e.getRightClicked() instanceof LivingEntity)) return;
 
         //Get persistent data from item
         ItemMeta itemMeta = clickedItem.getItemMeta();
@@ -61,11 +92,17 @@ public final class EntityCages extends JavaPlugin implements Listener {
         if(container.has(key , PersistentDataType.STRING)) return;
 
         //get the animal that was clicked
-        Animals animal = (Animals) e.getRightClicked();
+        LivingEntity animal = (LivingEntity) e.getRightClicked();
 
         //get the animal UUID and store it in the item
         String stringID = animal.getUniqueId().toString();
         container.set(key, PersistentDataType.STRING, stringID);
+
+        //Get the animal's world and store it in the item
+        String stringWorld = animal.getWorld().getUID().toString();
+        container.set(worldKey, PersistentDataType.STRING, stringWorld);
+
+        //Set lore and set item meta
         setLore(itemMeta, animal, e.getPlayer());
         clickedItem.setItemMeta(itemMeta);
 
@@ -75,13 +112,13 @@ public final class EntityCages extends JavaPlugin implements Listener {
         animal.setRemoveWhenFarAway(false);
     }
 
-    private void setLore(ItemMeta itemMeta, Animals animal, Player player){
+    private void setLore(ItemMeta itemMeta, LivingEntity animal, Player player){
         List<String> lore = new ArrayList<>();
         lore.add(capturedLoreLine);
         lore.add("§5Name: "+animal.getName());
         lore.add("§5Entity Type: "+ animal.getType());
         lore.add("§5Captured By: " +player.getName());
-        lore.add("§5Age: "+animal.getAge());
+        lore.add("§5Health: "+animal.getHealth());
         lore.add("§5UUID: "+animal.getUniqueId());
         itemMeta.setLore(lore);
     }
@@ -106,16 +143,24 @@ public final class EntityCages extends JavaPlugin implements Listener {
         //Get animal UUID from item data and get the entity
         String stringID = container.get(key, PersistentDataType.STRING);
         UUID uuid = UUID.fromString(stringID);
-        Animals animal = (Animals) Bukkit.getEntity(uuid);
+
+        //Get world from item data and load the chunk the animal is stored in
+        UUID worldID = UUID.fromString(container.get(worldKey, PersistentDataType.STRING));
+        World world = Bukkit.getWorld(worldID);
+
+        //Load chunk where entites are stored
+        new Location(world, 0, 1000, 0).getChunk().load();
+
+        //get entity and return if null
+        LivingEntity animal = (LivingEntity) Bukkit.getEntity(uuid);
 
         if(animal == null){
-            e.getPlayer().sendMessage("An error has occured resulting in your animal not being found. Please let me know about this through my spigot page");
-            e.getItem().setAmount(0);
             return;
         }
 
         //remove animal data from item
         container.remove(key);
+        container.remove(worldKey);
         List<String> lore = new ArrayList<>();
         lore.add(emptyLoreLine);
         itemMeta.setLore(lore);
@@ -130,11 +175,16 @@ public final class EntityCages extends JavaPlugin implements Listener {
         return cageKey;
     }
 
-    private void teleportAnimal(Animals animal, boolean bool, Location location){
+    private void teleportAnimal(LivingEntity animal, boolean bool, Location location){
         animal.setInvulnerable(!bool);
         animal.setGravity(bool);
         animal.setAI(bool);
         animal.setFallDistance(0);
+        if(!animal.getPassengers().isEmpty()){
+            for(Entity passenger: animal.getPassengers()){
+                animal.removePassenger(passenger);
+            }
+        }
         animal.teleport(location);
     }
 
@@ -144,6 +194,10 @@ public final class EntityCages extends JavaPlugin implements Listener {
 
     public String getEmptyLoreLine(){
         return emptyLoreLine;
+    }
+
+    public ItemStack getCage(){
+        return cage;
     }
 
     public String getCageKeyString(){
