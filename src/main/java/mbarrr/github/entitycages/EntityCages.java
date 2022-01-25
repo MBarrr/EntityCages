@@ -3,11 +3,14 @@ package mbarrr.github.entitycages;
 //TODO
 //Maybe add some particles
 //make type in description lower case
+//add different languages
+// world protect??
 
 import org.bukkit.*;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Tameable;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
@@ -19,7 +22,6 @@ import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.rmi.server.UID;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -27,13 +29,17 @@ import java.util.UUID;
 public final class EntityCages extends JavaPlugin implements Listener {
 
     private ItemStack cage;
-    private Material cageItemType = Material.GLASS_BOTTLE;
-    private String cageKeyString = "cage";
-    private String emptyLoreLine = "§eRight click an animal to capture it.";
-    private String capturedLoreLine = "§eRight click a block to release this animal";
+    private final Material oldCageItemType = Material.GLASS_BOTTLE;
+    private final Material cageItemType = Material.HEART_OF_THE_SEA;
+    private final String cageKeyString = "cage";
+    private final String emptyLoreLine = "§eRight click an animal to capture it.";
+    private final String capturedLoreLine = "§eRight click a block to release this animal";
     NamespacedKey cageKey = new NamespacedKey(this, getCageKeyString());
     NamespacedKey key = new NamespacedKey(this, "trapped-animal");
     NamespacedKey worldKey = new NamespacedKey(this, "trapped-animal-world");
+
+    //Config variables
+    private boolean allowCaptureTamedAnimals;
 
     @Override
     public void onEnable() {
@@ -42,15 +48,26 @@ public final class EntityCages extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
         cage = makeCage();
         loadRecipe();
+        loadDefaultConfig();
+        loadConfigVariables();
     }
 
     @Override
     public void onDisable() {
         // Plugin shutdown logic
-
-        
     }
 
+    //CONFIG METHODS
+    public void loadDefaultConfig(){
+        if(!getConfig().contains("allowCaptureTamedAnimals")) getConfig().set("allowCaptureTamedAnimals", false);
+        saveConfig();
+    }
+
+    public void loadConfigVariables(){
+        allowCaptureTamedAnimals = getConfig().getBoolean("allowCaptureTamedAnimals");
+    }
+
+    //ITEM METHODS
     private void loadRecipe(){
         ShapedRecipe cageRecipe = new ShapedRecipe(
                 new NamespacedKey(this, "test"),
@@ -79,9 +96,11 @@ public final class EntityCages extends JavaPlugin implements Listener {
         ItemStack clickedItem = e.getPlayer().getInventory().getItemInMainHand();
 
         //Stop the function if the item is not the cage item.
-        if(!clickedItem.getType().equals(cageItemType)) return;
+        if(!(clickedItem.getType().equals(cageItemType) || clickedItem.getType().equals(oldCageItemType))) return;
         //Stop the function if the entity is not an animal.
         if(!(e.getRightClicked() instanceof LivingEntity)) return;
+
+        Player player = e.getPlayer();
 
         //Get persistent data from item
         ItemMeta itemMeta = clickedItem.getItemMeta();
@@ -91,8 +110,19 @@ public final class EntityCages extends JavaPlugin implements Listener {
         if(!container.has(cageKey, PersistentDataType.STRING)) return;
         if(container.has(key , PersistentDataType.STRING)) return;
 
+        if(clickedItem.getType().equals(oldCageItemType)) clickedItem.setType(cageItemType);
+
         //get the animal that was clicked
         LivingEntity animal = (LivingEntity) e.getRightClicked();
+
+        //check if the animal is tameable, if it is, and it has an owner that isnt the player, do not allow capturing
+        if(animal instanceof Tameable){
+            Tameable tameable = (Tameable) animal;
+            if(tameable.getOwner() != null && !tameable.getOwner().equals(player) && !allowCaptureTamedAnimals){
+                player.sendMessage("You cannot catch this animal, as it belongs to someone else.");
+                return;
+            }
+        }
 
         //get the animal UUID and store it in the item
         String stringID = animal.getUniqueId().toString();
@@ -103,13 +133,14 @@ public final class EntityCages extends JavaPlugin implements Listener {
         container.set(worldKey, PersistentDataType.STRING, stringWorld);
 
         //Set lore and set item meta
-        setLore(itemMeta, animal, e.getPlayer());
+        setLore(itemMeta, animal, player);
         clickedItem.setItemMeta(itemMeta);
 
         //set the animal to invulnerable, 0 gravity and teleport it way up in the air, creating the illusion the animal has disappeared, also disable the animal's AI
         animal.setPersistent(true);
         teleportAnimal(animal, false, new Location(animal.getWorld(), 0, 1000, 0));
         animal.setRemoveWhenFarAway(false);
+        e.setCancelled(true);
     }
 
     private void setLore(ItemMeta itemMeta, LivingEntity animal, Player player){
@@ -129,7 +160,7 @@ public final class EntityCages extends JavaPlugin implements Listener {
         ItemStack clickedItem = e.getPlayer().getInventory().getItemInMainHand();
 
         //Stop the function if the item is not the cage item.
-        if(!clickedItem.getType().equals(cageItemType)) return;
+        if(!(clickedItem.getType().equals(cageItemType) || clickedItem.getType().equals(oldCageItemType))) return;
         if(e.getClickedBlock() == null) return;
 
         //Get persistent data from item
@@ -139,6 +170,8 @@ public final class EntityCages extends JavaPlugin implements Listener {
         //Stop the function if there is no animal in the cage or if the cage is not a legitimate cage
         if(!container.has(cageKey, PersistentDataType.STRING)) return;
         if(!container.has(key , PersistentDataType.STRING)) return;
+
+        if(clickedItem.getType().equals(oldCageItemType)) clickedItem.setType(cageItemType);
 
         //Get animal UUID from item data and get the entity
         String stringID = container.get(key, PersistentDataType.STRING);
@@ -168,12 +201,11 @@ public final class EntityCages extends JavaPlugin implements Listener {
 
         //teleport animal to safe location near player clicked block
         teleportAnimal(animal, true, e.getClickedBlock().getRelative(e.getBlockFace()).getLocation());
+        e.setCancelled(true);
     }
 
 
-    public NamespacedKey getCageKey(){
-        return cageKey;
-    }
+
 
     private void teleportAnimal(LivingEntity animal, boolean bool, Location location){
         animal.setInvulnerable(!bool);
@@ -186,6 +218,10 @@ public final class EntityCages extends JavaPlugin implements Listener {
             }
         }
         animal.teleport(location);
+    }
+
+    public NamespacedKey getCageKey(){
+        return cageKey;
     }
 
     public Material getCageItem(){
