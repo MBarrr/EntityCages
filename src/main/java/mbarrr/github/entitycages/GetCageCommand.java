@@ -1,18 +1,9 @@
 package mbarrr.github.entitycages;
 
-import org.bukkit.NamespacedKey;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.entity.Zombie;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataContainer;
-import org.bukkit.persistence.PersistentDataType;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public class GetCageCommand implements CommandExecutor {
 
@@ -25,6 +16,13 @@ public class GetCageCommand implements CommandExecutor {
         if(!(sender instanceof Player)) return false;
 
         Player player = (Player) sender;
+
+
+
+        if(!player.hasPermission("EntityCages.GetCage") && !EntityCages.getInstance().getAllowAllGetCageCommand()){
+            EntityCages.getInstance().sendPlayerMessage(player, "You do not have permission to do this.");
+            return true;
+        }
 
         player.getInventory().addItem(EntityCages.getInstance().getCage());
 

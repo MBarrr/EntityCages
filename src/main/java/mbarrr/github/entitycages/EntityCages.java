@@ -2,7 +2,6 @@ package mbarrr.github.entitycages;
 
 //TODO
 //Maybe add some particles
-//make type in description lower case
 //add different languages
 // world protect??
 
@@ -29,11 +28,14 @@ import java.util.UUID;
 public final class EntityCages extends JavaPlugin implements Listener {
 
     private ItemStack cage;
+    private String prefix = "§3[Cages]";
     private final Material oldCageItemType = Material.GLASS_BOTTLE;
     private final Material cageItemType = Material.HEART_OF_THE_SEA;
     private final String cageKeyString = "cage";
     private final String emptyLoreLine = "§eRight click an animal to capture it.";
     private final String capturedLoreLine = "§eRight click a block to release this animal";
+    private boolean allowCageCrafting;
+    private boolean allowAllGetCageCommand;
     NamespacedKey cageKey = new NamespacedKey(this, getCageKeyString());
     NamespacedKey key = new NamespacedKey(this, "trapped-animal");
     NamespacedKey worldKey = new NamespacedKey(this, "trapped-animal-world");
@@ -47,9 +49,9 @@ public final class EntityCages extends JavaPlugin implements Listener {
         this.getCommand("GetCage").setExecutor(new GetCageCommand());
         getServer().getPluginManager().registerEvents(this, this);
         cage = makeCage();
-        loadRecipe();
         loadDefaultConfig();
         loadConfigVariables();
+        loadRecipe();
     }
 
     @Override
@@ -60,15 +62,25 @@ public final class EntityCages extends JavaPlugin implements Listener {
     //CONFIG METHODS
     public void loadDefaultConfig(){
         if(!getConfig().contains("allowCaptureTamedAnimals")) getConfig().set("allowCaptureTamedAnimals", false);
+        if(!getConfig().contains("allowCageCrafting")) getConfig().set("allowCageCrafting", true);
+        if(!getConfig().contains("allowAllGetCageCommand")) getConfig().set("allowAllGetCageCommand", false);
         saveConfig();
     }
 
     public void loadConfigVariables(){
-        allowCaptureTamedAnimals = getConfig().getBoolean("allowCaptureTamedAnimals");
+        try {
+            allowCaptureTamedAnimals = getConfig().getBoolean("allowCaptureTamedAnimals");
+            allowCageCrafting = getConfig().getBoolean("allowCageCrafting");
+            allowAllGetCageCommand = getConfig().getBoolean("allowAllGetCageCommand");
+        }catch(Exception e){
+            Bukkit.getConsoleSender().sendMessage("An error has occurred while loading startup variables, please check the config for typos/errors.");
+        }
     }
 
     //ITEM METHODS
     private void loadRecipe(){
+        if(!allowCageCrafting) return;
+
         ShapedRecipe cageRecipe = new ShapedRecipe(
                 new NamespacedKey(this, "test"),
                 cage
@@ -119,7 +131,7 @@ public final class EntityCages extends JavaPlugin implements Listener {
         if(animal instanceof Tameable){
             Tameable tameable = (Tameable) animal;
             if(tameable.getOwner() != null && !tameable.getOwner().equals(player) && !allowCaptureTamedAnimals){
-                player.sendMessage("You cannot catch this animal, as it belongs to someone else.");
+                sendPlayerMessage(player,"You cannot catch this animal, as it belongs to someone else.");
                 return;
             }
         }
@@ -147,7 +159,11 @@ public final class EntityCages extends JavaPlugin implements Listener {
         List<String> lore = new ArrayList<>();
         lore.add(capturedLoreLine);
         lore.add("§5Name: "+animal.getName());
-        lore.add("§5Entity Type: "+ animal.getType());
+
+        String type = animal.getType().toString().toLowerCase();
+        type = type.substring(0 ,1).toUpperCase() + type.substring(1);
+
+        lore.add("§5Entity Type: "+ type);
         lore.add("§5Captured By: " +player.getName());
         lore.add("§5Health: "+animal.getHealth());
         lore.add("§5UUID: "+animal.getUniqueId());
@@ -188,6 +204,7 @@ public final class EntityCages extends JavaPlugin implements Listener {
         LivingEntity animal = (LivingEntity) Bukkit.getEntity(uuid);
 
         if(animal == null){
+            sendPlayerMessage(e.getPlayer(), "An error has occurred, please report this on the plugin page.");
             return;
         }
 
@@ -204,8 +221,9 @@ public final class EntityCages extends JavaPlugin implements Listener {
         e.setCancelled(true);
     }
 
-
-
+    public void sendPlayerMessage(Player player, String message){
+        player.sendMessage(prefix+" §a"+message);
+    }
 
     private void teleportAnimal(LivingEntity animal, boolean bool, Location location){
         animal.setInvulnerable(!bool);
@@ -230,6 +248,10 @@ public final class EntityCages extends JavaPlugin implements Listener {
 
     public String getEmptyLoreLine(){
         return emptyLoreLine;
+    }
+
+    public boolean getAllowAllGetCageCommand(){
+        return allowAllGetCageCommand;
     }
 
     public ItemStack getCage(){
