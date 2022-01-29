@@ -6,7 +6,7 @@
 
     <groupId>mbarrr.github</groupId>
     <artifactId>EntityCages</artifactId>
-    <version>1.0.3</version>
+    <version>1.0.4</version>
     <packaging>jar</packaging>
 
     <name>EntityCages</name>
