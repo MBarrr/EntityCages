@@ -6,10 +6,7 @@ package mbarrr.github.entitycages;
 // world protect??
 
 import org.bukkit.*;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Player;
-import org.bukkit.entity.Tameable;
+import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
@@ -28,12 +25,14 @@ import java.util.UUID;
 public final class EntityCages extends JavaPlugin implements Listener {
 
     private ItemStack cage;
-    private String prefix = "§3[Cages]";
+    private String prefix = "§3[Cages] ";
     private final Material oldCageItemType = Material.GLASS_BOTTLE;
     private final Material cageItemType = Material.HEART_OF_THE_SEA;
     private final String cageKeyString = "cage";
     private final String emptyLoreLine = "§eRight click an animal to capture it.";
     private final String capturedLoreLine = "§eRight click a block to release this animal";
+    private List<EntityType> excludedEntities = new ArrayList<>();
+    private List<String> excludedNames = new ArrayList<>();
     private boolean allowCageCrafting;
     private boolean allowAllGetCageCommand;
     NamespacedKey cageKey = new NamespacedKey(this, getCageKeyString());
@@ -45,8 +44,11 @@ public final class EntityCages extends JavaPlugin implements Listener {
 
     @Override
     public void onEnable() {
+
         // Plugin startup logic
         this.getCommand("GetCage").setExecutor(new GetCageCommand());
+        this.getCommand("excludeEntity").setExecutor(new ExcludeEntityCommand(this));
+        this.getCommand("excludeName").setExecutor(new ExcludeNameCommand(this));
         getServer().getPluginManager().registerEvents(this, this);
         cage = makeCage();
         loadDefaultConfig();
@@ -57,6 +59,13 @@ public final class EntityCages extends JavaPlugin implements Listener {
     @Override
     public void onDisable() {
         // Plugin shutdown logic
+        List<String> list = new ArrayList<>();
+        for(EntityType entityType : excludedEntities){
+            list.add(entityType.toString());
+        }
+        getConfig().set("excludedEntities", list);
+        getConfig().set("excludedNames", excludedNames);
+        saveConfig();
     }
 
     //CONFIG METHODS
@@ -64,6 +73,8 @@ public final class EntityCages extends JavaPlugin implements Listener {
         if(!getConfig().contains("allowCaptureTamedAnimals")) getConfig().set("allowCaptureTamedAnimals", false);
         if(!getConfig().contains("allowCageCrafting")) getConfig().set("allowCageCrafting", true);
         if(!getConfig().contains("allowAllGetCageCommand")) getConfig().set("allowAllGetCageCommand", false);
+        if(!getConfig().contains("excludedEntities")) getConfig().set("excludedEntities", new ArrayList<>());
+        if(!getConfig().contains("excludedNames")) getConfig().set("excludedNames", new ArrayList<>());
         saveConfig();
     }
 
@@ -72,6 +83,12 @@ public final class EntityCages extends JavaPlugin implements Listener {
             allowCaptureTamedAnimals = getConfig().getBoolean("allowCaptureTamedAnimals");
             allowCageCrafting = getConfig().getBoolean("allowCageCrafting");
             allowAllGetCageCommand = getConfig().getBoolean("allowAllGetCageCommand");
+            excludedNames = getConfig().getStringList("excludedNames");
+
+            List<String> strList = getConfig().getStringList("excludedEntities");
+            for(String str : strList){
+                excludedEntities.add(EntityType.valueOf(str));
+            }
         }catch(Exception e){
             Bukkit.getConsoleSender().sendMessage("An error has occurred while loading startup variables, please check the config for typos/errors.");
         }
@@ -126,6 +143,9 @@ public final class EntityCages extends JavaPlugin implements Listener {
 
         //get the animal that was clicked
         LivingEntity animal = (LivingEntity) e.getRightClicked();
+
+        if(excludedEntities.contains(animal.getType())) return;
+        if(excludedNames.contains(animal.getName())) return;
 
         //check if the animal is tameable, if it is, and it has an owner that isnt the player, do not allow capturing
         if(animal instanceof Tameable){
@@ -222,7 +242,7 @@ public final class EntityCages extends JavaPlugin implements Listener {
     }
 
     public void sendPlayerMessage(Player player, String message){
-        player.sendMessage(prefix+" §a"+message);
+        player.sendMessage(prefix+"§a"+message);
     }
 
     private void teleportAnimal(LivingEntity animal, boolean bool, Location location){
@@ -264,5 +284,45 @@ public final class EntityCages extends JavaPlugin implements Listener {
 
     public static EntityCages getInstance(){
         return (EntityCages) Bukkit.getPluginManager().getPlugin("EntityCages");
+    }
+
+    public List<EntityType> getExcludedEntities(){
+        return excludedEntities;
+    }
+
+    public boolean addEntityExclusion(EntityType entityType){
+        if(excludedEntities.contains(entityType)) return false;
+        else{
+            excludedEntities.add(entityType);
+            return true;
+        }
+    }
+
+    public boolean removeEntityExclusion(EntityType entityType){
+        if(!excludedEntities.contains(entityType)) return false;
+        else{
+            excludedEntities.remove(entityType);
+            return true;
+        }
+    }
+
+    public List<String> getExcludedNames(){
+        return excludedNames;
+    }
+
+    public boolean addNameExclusion(String name){
+        if(excludedNames.contains(name)) return false;
+        else{
+            excludedNames.add(name);
+            return true;
+        }
+    }
+
+    public boolean removeNameExclusion(String name){
+        if(!excludedNames.contains(name)) return false;
+        else{
+            excludedNames.remove(name);
+            return true;
+        }
     }
 }

@@ -8,3 +8,9 @@ commands:
   getCage:
     usage: /getcage
     description: §eUsed to get a cage item.
+  excludeEntity:
+    usage: /excludeEntity <EntityType> <true/false>
+    description: Leave arguments empty to view excluded entities
+  excludeName:
+    usage: /excludeName <Name> <true/false>
+    description: Leave arguments empty to view excluded names
