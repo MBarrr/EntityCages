@@ -129,6 +129,8 @@ public final class EntityCages extends JavaPlugin implements Listener {
         //Stop the function if the entity is not an animal.
         if(!(e.getRightClicked() instanceof LivingEntity)) return;
 
+        if(e.getRightClicked() instanceof Player) return;
+
         Player player = e.getPlayer();
 
         //Get persistent data from item

@@ -11,6 +11,8 @@ commands:
   excludeEntity:
     usage: /excludeEntity <EntityType> <true/false>
     description: Leave arguments empty to view excluded entities
+    permission: EntityCages.exclude
   excludeName:
     usage: /excludeName <Name> <true/false>
     description: Leave arguments empty to view excluded names
+    permission: EntityCages.exclude
