@@ -1,10 +1,5 @@
 package mbarrr.github.entitycages;
 
-//TODO
-//Maybe add some particles
-//add different languages
-// world protect??
-
 import org.bukkit.*;
 import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
@@ -25,19 +20,23 @@ import java.util.UUID;
 public final class EntityCages extends JavaPlugin implements Listener {
 
     private ItemStack cage;
-    private String prefix = "§3[Cages] ";
+    private String prefix;
     private final Material oldCageItemType = Material.GLASS_BOTTLE;
     private final Material cageItemType = Material.HEART_OF_THE_SEA;
     private final String cageKeyString = "cage";
-    private final String emptyLoreLine = "§eRight click an animal to capture it.";
-    private final String capturedLoreLine = "§eRight click a block to release this animal";
+    private List<String> emptyLoreLine;
+    private String cageTitle;
+    private List<String> capturedLoreLine;
+    private boolean allowAllUseCage;
     private List<EntityType> excludedEntities = new ArrayList<>();
     private List<String> excludedNames = new ArrayList<>();
     private boolean allowCageCrafting;
     private boolean allowAllGetCageCommand;
+    private String loreColor;
     NamespacedKey cageKey = new NamespacedKey(this, getCageKeyString());
     NamespacedKey key = new NamespacedKey(this, "trapped-animal");
     NamespacedKey worldKey = new NamespacedKey(this, "trapped-animal-world");
+    private String chatColor;
 
     //Config variables
     private boolean allowCaptureTamedAnimals;
@@ -50,9 +49,10 @@ public final class EntityCages extends JavaPlugin implements Listener {
         this.getCommand("excludeEntity").setExecutor(new ExcludeEntityCommand(this));
         this.getCommand("excludeName").setExecutor(new ExcludeNameCommand(this));
         getServer().getPluginManager().registerEvents(this, this);
-        cage = makeCage();
+
         loadDefaultConfig();
         loadConfigVariables();
+        cage = makeCage();
         loadRecipe();
     }
 
@@ -72,11 +72,38 @@ public final class EntityCages extends JavaPlugin implements Listener {
     public void loadDefaultConfig(){
         if(!getConfig().contains("allowCaptureTamedAnimals")) getConfig().set("allowCaptureTamedAnimals", false);
         if(!getConfig().contains("allowCageCrafting")) getConfig().set("allowCageCrafting", true);
+        if(!getConfig().contains("allowAllUseCage")) getConfig().set("allowAllUseCage", true);
         if(!getConfig().contains("allowAllGetCageCommand")) getConfig().set("allowAllGetCageCommand", false);
         if(!getConfig().contains("excludedEntities")) getConfig().set("excludedEntities", new ArrayList<>());
         if(!getConfig().contains("excludedNames")) getConfig().set("excludedNames", new ArrayList<>());
+        if(!getConfig().contains("prefix")) getConfig().set("prefix", "§3[Cages]");
+        if(!getConfig().contains("chatColor")) getConfig().set("chatColor", "§b");
+        if(!getConfig().contains("loreColor")) getConfig().set("loreColor", "§5");
+
+        if(!getConfig().contains("emptyCageLore")){
+            List<String> lore = new ArrayList<>();
+            lore.add("§eRight click an animal to capture it.");
+            getConfig().set("emptyCageLore", lore);
+        }
+        if(!getConfig().contains("capturedCageLore")){
+            List<String> lore = new ArrayList<>();
+            lore.add("§eRight click a block to release this animal");
+            getConfig().set("capturedCageLore", lore);
+        }
+
+        if(!getConfig().contains("cageTitle")) getConfig().set("cageTitle", "§eCage");
+
         saveConfig();
     }
+
+    /*
+    Chat prefix customizable in config
+    Chat colour customizable in config
+    Cage lore customizable in config for empty cages and cages holding entities
+    Cage name customizable in config
+    Use cage permission added
+    */
+
 
     public void loadConfigVariables(){
         try {
@@ -84,6 +111,15 @@ public final class EntityCages extends JavaPlugin implements Listener {
             allowCageCrafting = getConfig().getBoolean("allowCageCrafting");
             allowAllGetCageCommand = getConfig().getBoolean("allowAllGetCageCommand");
             excludedNames = getConfig().getStringList("excludedNames");
+            allowAllUseCage = getConfig().getBoolean("allowAllUseCage");
+            emptyLoreLine = getConfig().getStringList("emptyCageLore");
+            capturedLoreLine = getConfig().getStringList("capturedCageLore");
+            cageTitle = getConfig().getString("cageTitle");
+            prefix = getConfig().getString("prefix");
+            chatColor = getConfig().getString("chatColor");
+            loreColor = getConfig().getString("loreColor");
+
+
 
             List<String> strList = getConfig().getStringList("excludedEntities");
             for(String str : strList){
@@ -109,11 +145,9 @@ public final class EntityCages extends JavaPlugin implements Listener {
 
     private ItemStack makeCage(){
         ItemStack cage = new ItemStack(getCageItem());
-        List<String> lore = new ArrayList<>();
-        lore.add(getEmptyLoreLine());
         ItemMeta itemMeta = cage.getItemMeta();
-        itemMeta.setDisplayName("§eCage");
-        itemMeta.setLore(lore);
+        itemMeta.setDisplayName(cageTitle);
+        itemMeta.setLore(emptyLoreLine);
         PersistentDataContainer container = itemMeta.getPersistentDataContainer();
         container.set(getCageKey(), PersistentDataType.STRING, "");
         cage.setItemMeta(itemMeta);
@@ -143,6 +177,12 @@ public final class EntityCages extends JavaPlugin implements Listener {
 
         if(clickedItem.getType().equals(oldCageItemType)) clickedItem.setType(cageItemType);
 
+        if(!player.hasPermission("entitycages.use") && !player.isOp() && !allowAllUseCage){
+            sendPlayerMessage(player, "You do not have permission to do this.");
+            return;
+        }
+
+
         //get the animal that was clicked
         LivingEntity animal = (LivingEntity) e.getRightClicked();
 
@@ -167,6 +207,7 @@ public final class EntityCages extends JavaPlugin implements Listener {
         container.set(worldKey, PersistentDataType.STRING, stringWorld);
 
         //Set lore and set item meta
+        itemMeta.setDisplayName(cageTitle);
         setLore(itemMeta, animal, player);
         clickedItem.setItemMeta(itemMeta);
 
@@ -178,17 +219,18 @@ public final class EntityCages extends JavaPlugin implements Listener {
     }
 
     private void setLore(ItemMeta itemMeta, LivingEntity animal, Player player){
-        List<String> lore = new ArrayList<>();
-        lore.add(capturedLoreLine);
-        lore.add("§5Name: "+animal.getName());
+        List<String> lore = new ArrayList<>(capturedLoreLine);
+
+
+        lore.add(loreColor+"Name: "+animal.getName());
 
         String type = animal.getType().toString().toLowerCase();
         type = type.substring(0 ,1).toUpperCase() + type.substring(1);
 
-        lore.add("§5Entity Type: "+ type);
-        lore.add("§5Captured By: " +player.getName());
-        lore.add("§5Health: "+animal.getHealth());
-        lore.add("§5UUID: "+animal.getUniqueId());
+        lore.add(loreColor+"Entity Type: "+ type);
+        lore.add(loreColor+"Captured By: " +player.getName());
+        lore.add(loreColor+"Health: "+animal.getHealth());
+        lore.add(loreColor+"UUID: "+animal.getUniqueId());
         itemMeta.setLore(lore);
     }
 
@@ -210,6 +252,13 @@ public final class EntityCages extends JavaPlugin implements Listener {
         if(!container.has(key , PersistentDataType.STRING)) return;
 
         if(clickedItem.getType().equals(oldCageItemType)) clickedItem.setType(cageItemType);
+
+        Player player = e.getPlayer();
+
+        if(!player.hasPermission("entitycages.use") && !player.isOp() && !allowAllUseCage){
+            sendPlayerMessage(player, "You do not have permission to do this.");
+            return;
+        }
 
         //Get animal UUID from item data and get the entity
         String stringID = container.get(key, PersistentDataType.STRING);
@@ -233,9 +282,8 @@ public final class EntityCages extends JavaPlugin implements Listener {
         //remove animal data from item
         container.remove(key);
         container.remove(worldKey);
-        List<String> lore = new ArrayList<>();
-        lore.add(emptyLoreLine);
-        itemMeta.setLore(lore);
+        itemMeta.setLore(emptyLoreLine);
+        itemMeta.setDisplayName(cageTitle);
         clickedItem.setItemMeta(itemMeta);
 
         //teleport animal to safe location near player clicked block
@@ -244,7 +292,7 @@ public final class EntityCages extends JavaPlugin implements Listener {
     }
 
     public void sendPlayerMessage(Player player, String message){
-        player.sendMessage(prefix+"§a"+message);
+        player.sendMessage(prefix+" "+chatColor+message);
     }
 
     private void teleportAnimal(LivingEntity animal, boolean bool, Location location){
@@ -266,10 +314,6 @@ public final class EntityCages extends JavaPlugin implements Listener {
 
     public Material getCageItem(){
         return cageItemType;
-    }
-
-    public String getEmptyLoreLine(){
-        return emptyLoreLine;
     }
 
     public boolean getAllowAllGetCageCommand(){

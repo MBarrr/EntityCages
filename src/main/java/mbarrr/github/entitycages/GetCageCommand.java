@@ -19,7 +19,7 @@ public class GetCageCommand implements CommandExecutor {
 
 
 
-        if(!player.hasPermission("EntityCages.GetCage") && !EntityCages.getInstance().getAllowAllGetCageCommand()){
+        if(!player.hasPermission("EntityCages.GetCage") && !EntityCages.getInstance().getAllowAllGetCageCommand() && !player.isOp()){
             EntityCages.getInstance().sendPlayerMessage(player, "You do not have permission to do this.");
             return true;
         }
